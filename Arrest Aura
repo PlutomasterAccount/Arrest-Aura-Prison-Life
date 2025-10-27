@@ -1,5 +1,3 @@
--- Arrest Aura – GitHub loader (obfuscation-safe, max 10 studs)
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -44,7 +42,6 @@ local function stopAura()
     if arrestConn then arrestConn:Disconnect() arrestConn = nil end
 end
 
--- Wait for WeaponsTab (by Title)
 local WeaponsTab
 repeat
     task.wait()
