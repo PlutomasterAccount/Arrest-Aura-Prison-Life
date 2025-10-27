@@ -1,65 +1,86 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local player = Players.LocalPlayer
 
+local LocalPlayer = Players.LocalPlayer
 local arrestEnabled = false
 local arrestRange = 10
-local arrestConn = nil
+local heartbeatConnection = nil
 
-local function getRemote()
-    local r = ReplicatedStorage:FindFirstChild("Remotes")
-    return r and r:FindFirstChild("ArrestPlayer")
+local function findArrestRemote()
+	local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
+	if not remotesFolder then return end
+	return remotesFolder:FindFirstChild("ArrestPlayer")
 end
 
-local function start()
-    if arrestConn then arrestConn:Disconnect() end
-    arrestConn = RunService.Heartbeat:Connect(function()
-        local char = player.Character
-        if not char then return end
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-        local remote = getRemote()
-        if not remote then return end
+local function startArrestLoop()
+	if heartbeatConnection then heartbeatConnection:Disconnect() end
 
-        for _, p in Players:GetPlayers() do
-            if p == player or (p.Team and p.Team.Name ~= "Criminals") then continue end
-            local tc = p.Character
-            if not tc then continue end
-            local tr = tc:FindFirstChild("HumanoidRootPart")
-            local hum = tc:FindFirstChild("Humanoid")
-            if not tr or not hum or hum.Health <= 0 then continue end
-            if (root.Position - tr.Position).Magnitude <= arrestRange then
-                task.spawn(function()
-                    pcall(function() remote:InvokeServer(p) end)
-                end)
-            end
-        end
-    end)
+	heartbeatConnection = RunService.Heartbeat:Connect(function()
+		if not arrestEnabled then return end
+
+		local character = LocalPlayer.Character
+		if not character then return end
+
+		local rootPart = character:FindFirstChild("HumanoidRootPart")
+		if not rootPart then return end
+
+		local arrestRemote = findArrestRemote()
+		if not arrestRemote then return end
+
+		for _, targetPlayer in ipairs(Players:GetPlayers()) do
+			if targetPlayer == LocalPlayer then continue end
+
+			local targetChar = targetPlayer.Character
+			if not targetChar then continue end
+
+			local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+			local targetHum = targetChar:FindFirstChild("Humanoid")
+			if not targetRoot or not targetHum or targetHum.Health <= 0 then continue end
+
+			local distance = (rootPart.Position - targetRoot.Position).Magnitude
+			if distance <= arrestRange then
+				task.spawn(function()
+					pcall(function()
+						arrestRemote:InvokeServer(targetPlayer)
+					end)
+				end)
+			end
+		end
+	end)
 end
 
-local function stop()
-    if arrestConn then arrestConn:Disconnect() arrestConn = nil end
+local function stopArrestLoop()
+	if heartbeatConnection then
+		heartbeatConnection:Disconnect()
+		heartbeatConnection = nil
+	end
 end
 
--- Grab the tab that the main script exposed
-local WeaponsTab = getgenv().FunnyHub_WeaponsTab
-if not WeaponsTab then return end
+-- Grab the UI tab that the main script exposed
+local weaponsTab = getgenv().FunnyHub_WeaponsTab
+if not weaponsTab then return end
 
-WeaponsTab:Toggle({
-    Title = "Arrest Aura",
-    Description = "Auto‑arrest nearby criminals",
-    Default = false,
-    Callback = function(state)
-        arrestEnabled = state
-        if state then start() else stop() end
-    end
+weaponsTab:Toggle({
+	Title = "Arrest Aura",
+	Description = "Automatically arrest any nearby players",
+	Default = false,
+	Callback = function(enabled)
+		arrestEnabled = enabled
+		if enabled then
+			startArrestLoop()
+		else
+			stopArrestLoop()
+		end
+	end
 })
 
-WeaponsTab:Slider({
-    Title = "Arrest Range",
-    Description = "Max distance (1‑10 studs)",
-    Value = { Min = 1, Max = 10, Default = 10 },
-    Step = 0.5,
-    Callback = function(val) arrestRange = val end
+weaponsTab:Slider({
+	Title = "Arrest Range",
+	Description = "Maximum distance to arrest (1‑10 studs)",
+	Value = { Min = 1, Max = 10, Default = 10 },
+	Step = 0.5,
+	Callback = function(value)
+		arrestRange = value
+	end
 })
