@@ -57,7 +57,6 @@ local function stopArrestLoop()
 	end
 end
 
--- Grab the UI tab that the main script exposed
 local weaponsTab = getgenv().FunnyHub_WeaponsTab
 if not weaponsTab then return end
 
