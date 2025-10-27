@@ -1,54 +1,75 @@
-local arrestAuraEnabled = false
-local arrestConn
-local arrestRange = 0.50
+-- Arrest Aura – GitHub loader (obfuscation-safe, max 10 studs)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+local arrestEnabled = false
+local arrestRange = 10
+local arrestConn = nil
+
+local function getArrestRemote()
+    local r = ReplicatedStorage:FindFirstChild("Remotes")
+    return r and r:FindFirstChild("ArrestPlayer")
+end
+
+local function startAura()
+    if arrestConn then arrestConn:Disconnect() end
+    arrestConn = RunService.Heartbeat:Connect(function()
+        local char = player.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        local remote = getArrestRemote()
+        if not remote then return end
+
+        for _, plr in Players:GetPlayers() do  do
+            if plr == player or (plr.Team and plr.Team.Name ~= "Criminals") then continue end
+            local tChar = plr.Character
+            if not tChar then continue end
+            local tRoot = tChar:FindFirstChild("HumanoidRootPart")
+            local hum = tChar:FindFirstChild("Humanoid")
+            if not tRoot or not hum or hum.Health <= 0 then continue end
+            if (root.Position - tRoot.Position).Magnitude <= arrestRange then
+                task.spawn(function()
+                    pcall(function() remote:InvokeServer(plr) end)
+                end)
+            end
+        end
+    end)
+end
+
+local function stopAura()
+    if arrestConn then arrestConn:Disconnect() arrestConn = nil end
+end
+
+-- Wait for WeaponsTab (by Title)
+local WeaponsTab
+repeat
+    task.wait()
+    for _, v in pairs(getgc(true)) do
+        if typeof(v) == "table" and rawget(v, "Title") == "Weapons" then
+            WeaponsTab = v
+            break
+        end
+    end
+until WeaponsTab
 
 WeaponsTab:Toggle({
     Title = "Arrest Aura",
-    Description = "Auto-arrest nearby players",
+    Description = "Auto-arrest nearby criminals",
     Default = false,
     Callback = function(state)
-        arrestAuraEnabled = state
-
-        if state then
-            arrestConn = RunService.Heartbeat:Connect(function()
-                local myChar = player.Character
-                if not myChar then return end
-                local myRoot = myChar:FindFirstChild("HumanoidRootPart")
-                if not myRoot then return end
-
-                for _, plr in Players:GetPlayers() do
-                    if plr == player then continue end
-                    local char = plr.Character
-                    if not char then continue end
-                    local root = char:FindFirstChild("HumanoidRootPart")
-                    local hum = char:FindFirstChild("Humanoid")
-                    if not root or not hum or hum.Health <= 0 then continue end
-                    if (myRoot.Position - root.Position).Magnitude <= arrestRange then
-                        task.spawn(function()
-                            pcall(ReplicatedStorage.Remotes.ArrestPlayer.InvokeServer, ReplicatedStorage.Remotes.ArrestPlayer, plr)
-                        end)
-                    end
-                end
-            end)
-        else
-            if arrestConn then
-                arrestConn:Disconnect()
-                arrestConn = nil
-            end
-        end
+        arrestEnabled = state
+        if state then startAura() else stopAura() end
     end
 })
 
 WeaponsTab:Slider({
     Title = "Arrest Range",
-    Description = "Adjust arrest aura radius",
-    Value = {
-        Min = 0.5,
-        Max = 10,
-        Default = 10
-    },
+    Description = "Max distance (1-10)",
+    Value = { Min = 1, Max = 10, Default = 10 },
     Step = 0.5,
-    Callback = function(val)
-        arrestRange = val
-    end
+    Callback = function(val) arrestRange = val end
 })
