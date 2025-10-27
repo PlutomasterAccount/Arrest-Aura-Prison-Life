@@ -2,47 +2,47 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local LocalPlayer = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer, "LocalPlayer"
 local arrestEnabled = false
 local arrestRange = 10
-local heartbeatConnection = nil
+local heartbeatConn = nil
 
-local function findArrestRemote()
-	local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
-	if not remotesFolder then return end
-	return remotesFolder:FindFirstChild("ArrestPlayer")
+local function getArrestRemote()
+	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+	if not remotes then return end
+	return remotes:FindFirstChild("ArrestPlayer")
 end
 
-local function startArrestLoop()
-	if heartbeatConnection then heartbeatConnection:Disconnect() end
+local function startLoop()
+	if heartbeatConn then heartbeatConn:Disconnect() end
 
-	heartbeatConnection = RunService.Heartbeat:Connect(function()
+	heartbeatConn = RunService.Heartbeat:Connect(function()
 		if not arrestEnabled then return end
 
-		local character = LocalPlayer.Character
-		if not character then return end
+		local char = LocalPlayer.Character
+		if not char then return end
 
-		local rootPart = character:FindFirstChild("HumanoidRootPart")
-		if not rootPart then return end
+		local root = char:FindFirstChild("HumanoidRootPart")
+		if not root then return end
 
-		local arrestRemote = findArrestRemote()
-		if not arrestRemote then return end
+		local remote = getArrestRemote()
+		if not remote then return end
 
-		for _, targetPlayer in ipairs(Players:GetPlayers()) do
-			if targetPlayer == LocalPlayer then continue end
+		for _, target in Players:GetPlayers() do
+			if target == LocalPlayer then continue end
 
-			local targetChar = targetPlayer.Character
-			if not targetChar then continue end
+			local tChar = target.Character
+			if not tChar then continue end
 
-			local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-			local targetHum = targetChar:FindFirstChild("Humanoid")
-			if not targetRoot or not targetHum or targetHum.Health <= 0 then continue end
+			local tRoot = tChar:FindFirstChild("HumanoidRootPart")
+			local tHum = tChar:FindFirstChild("Humanoid")
+			if not tRoot or not tHum or tHum.Health <= 0 then continue end
 
-			local distance = (rootPart.Position - targetRoot.Position).Magnitude
-			if distance <= arrestRange then
+			local dist = (root.Position - tRoot.Position).Magnitude
+			if dist <= arrestRange then
 				task.spawn(function()
 					pcall(function()
-						arrestRemote:InvokeServer(targetPlayer)
+						remote:InvokeServer(target)
 					end)
 				end)
 			end
@@ -50,10 +50,10 @@ local function startArrestLoop()
 	end)
 end
 
-local function stopArrestLoop()
-	if heartbeatConnection then
-		heartbeatConnection:Disconnect()
-		heartbeatConnection = nil
+local function stopLoop()
+	if heartbeatConn then
+		heartbeatConn:Disconnect()
+		heartbeatConn = nil
 	end
 end
 
@@ -62,24 +62,25 @@ if not weaponsTab then return end
 
 weaponsTab:Toggle({
 	Title = "Arrest Aura",
-	Description = "Automatically arrest any nearby players",
+	Description = "Automatically arrest any nearby player",
 	Default = false,
-	Callback = function(enabled)
-		arrestEnabled = enabled
-		if enabled then
-			startArrestLoop()
-		else
-			stopArrestLoop()
-		end
+	Callback = function(state)
+		arrestEnabled = state
+		if state then startLoop() else stopLoop() end
 	end
 })
 
 weaponsTab:Slider({
 	Title = "Arrest Range",
-	Description = "Maximum distance to arrest (1‑10 studs)",
+	Description = "Maximum distance (1-10 studs)",
 	Value = { Min = 1, Max = 10, Default = 10 },
 	Step = 0.5,
 	Callback = function(value)
-		arrestRange = value
+		local num = tonumber(value)
+		if num and num >= 1 and num <= 10 then
+			arrestRange = num
+		else
+			arrestRange = 10
+		end
 	end
 })
